@@ -1,141 +1,154 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/useAppStore';
-import { analysisService, AnalysisResponse } from '../services/analysisService';
-import { Loader2, Sparkles, AlertCircle, CheckCircle2, ChevronRight, Brain } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { Brain, AlertCircle, Activity, Info } from 'lucide-react';
+
+// Define the shape of our new perfect JSON
+interface NeuroData {
+  module: string;
+  privacy_check: boolean;
+  radar_data: Array<{
+    trait: string;
+    probability: number;
+  }>;
+  key_findings: Array<{
+    gene: string;
+    rsid: string;
+    impact: 'High' | 'Medium' | 'Low';
+    summary: string;
+  }>;
+}
 
 export default function Neurodivergence() {
-  const { hasData, snpData } = useAppStore();
-  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAppStore();
+  const [data, setData] = useState<NeuroData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (hasData && snpData && !analysis && !isLoading) {
-      runAnalysis();
-    }
-  }, [hasData, snpData]);
+    async function fetchModuleData() {
+      if (!user) return;
+      try {
+        // First, check if we already have the data cached in Supabase
+        const { data: cachedResult, error: dbError } = await supabase
+          .from('module_results')
+          .select('ai_summary')
+          .eq('user_id', user.id)
+          .eq('module_name', 'Neurodivergence')
+          .single();
 
-  const runAnalysis = async () => {
-    if (!snpData) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await analysisService.analyzeModule('neurodivergence', snpData);
-      setAnalysis(result);
-    } catch (err) {
-      setError('Failed to interpret genomic data. Please check your connection and try again.');
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        if (cachedResult?.ai_summary) {
+          setData(cachedResult.ai_summary as NeuroData);
+          setLoading(false);
+          return;
+        }
 
-  if (!hasData) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[70vh] text-center space-y-6">
-        <div className="w-20 h-20 bg-slate-100 text-slate-400 rounded-3xl flex items-center justify-center shadow-inner">
-          <Brain className="w-10 h-10" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold text-slate-800">Module Locked</h2>
-          <p className="text-slate-500 max-w-md mx-auto">
-            Please upload and process your DNA data in the <strong>Data Ingestion</strong> module to unlock the Neurodivergence analysis.
-          </p>
-        </div>
-      </div>
-    );
-  }
+        // If not cached, call the Edge Function to process it
+        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('interpret-dna', {
+          body: { moduleName: 'Neurodivergence' },
+        });
+
+        if (edgeError) throw edgeError;
+        setData(edgeData);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load neurogenetics profile.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchModuleData();
+  }, [user]);
+
+  if (loading) return <div className="flex justify-center items-center h-screen animate-pulse text-indigo-500">Sequencing Neural Pathways...</div>;
+  if (error) return <div className="p-6 bg-red-50 text-red-600 rounded-lg shadow-sm">Error: {error}</div>;
+  if (!data) return null;
+
+  // Format data for the radar chart (converting 0.55 to 55 for visual scaling)
+  const chartData = data.radar_data.map(d => ({
+    subject: d.trait,
+    A: d.probability * 100,
+    fullMark: 100,
+  }));
 
   return (
-    <div className="space-y-8 max-w-5xl">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-widest">
-            <Sparkles className="w-4 h-4" />
-            AI Interpretation Active
-          </div>
-          <h1 className="text-4xl font-black tracking-tight text-slate-900">Neurodivergence</h1>
-          <p className="text-slate-500 font-medium text-lg">Probability radar chart based on dopamine and serotonin transport SNPs.</p>
-        </div>
+    <div className="max-w-6xl mx-auto p-6 space-y-8">
+      
+      <header className="border-b pb-6">
+        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+          <Brain className="w-8 h-8 text-indigo-600" />
+          Neurological Profile
+        </h1>
+        <p className="text-gray-500 mt-2">
+          Mapping your dopaminergic, serotonergic, and structural neuro-pathways.
+        </p>
       </header>
 
-      <AnimatePresence mode="wait">
-        {isLoading ? (
-          <motion.div 
-            key="loading"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-12 flex flex-col items-center justify-center space-y-6 min-h-[400px]"
-          >
-            <Loader2 className="w-16 h-16 text-indigo-600 animate-spin" />
-            <h3 className="text-xl font-bold text-slate-800">Querying Gemini AI</h3>
-          </motion.div>
-        ) : error ? (
-          <div className="bg-red-50 border border-red-100 rounded-3xl p-8 text-center space-y-4">
-            <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
-            <p className="text-red-700">{error}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* Radar Chart Section */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <h2 className="text-xl font-semibold mb-6 text-gray-800">Cognitive Processing Overlap</h2>
+          <div className="h-[400px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={chartData}>
+                <PolarGrid stroke="#e5e7eb" />
+                <PolarAngleAxis dataKey="subject" tick={{ fill: '#4b5563', fontSize: 12 }} />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                <Radar
+                  name="Probability (%)"
+                  dataKey="A"
+                  stroke="#4f46e5"
+                  strokeWidth={2}
+                  fill="#4f46e5"
+                  fillOpacity={0.4}
+                />
+                <Tooltip 
+                  formatter={(value: number) => [`${value.toFixed(1)}%`, 'Propensity']}
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
           </div>
-        ) : analysis ? (
-          <div className="space-y-6">
-            {analysis.data.map((item: any) => (
-              <motion.div 
-                key={item.condition}
-                className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden"
-              >
-                <button 
-                  onClick={() => setExpandedId(expandedId === item.condition ? null : item.condition)}
-                  className="w-full p-6 flex items-center justify-between hover:bg-slate-50 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center font-bold text-indigo-600">
-                      {(item.likelihood * 100).toFixed(0)}%
-                    </div>
-                    <div className="text-left">
-                      <h3 className="font-bold text-lg text-slate-900">{item.condition}</h3>
-                      <p className="text-sm text-slate-500">{item.description}</p>
-                    </div>
-                  </div>
-                  <ChevronRight className={cn("w-6 h-6 text-slate-400 transition-transform", expandedId === item.condition && "rotate-90")} />
-                </button>
+        </div>
 
-                <AnimatePresence>
-                  {expandedId === item.condition && (
-                    <motion.div 
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      className="px-6 pb-6"
-                    >
-                      <div className="grid md:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <h4 className="font-bold text-xs text-slate-400 uppercase mb-2">Key Markers</h4>
-                          <ul className="text-sm text-slate-700 list-disc list-inside">
-                            {item.bento_info.key_markers.map((m: string) => <li key={m}>{m}</li>)}
-                          </ul>
-                        </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <h4 className="font-bold text-xs text-slate-400 uppercase mb-2">Mechanism</h4>
-                          <p className="text-sm text-slate-700">{item.bento_info.mechanism}</p>
-                        </div>
-                        <div className="bg-slate-50 p-4 rounded-2xl">
-                          <h4 className="font-bold text-xs text-slate-400 uppercase mb-2">Common Traits</h4>
-                          <ul className="text-sm text-slate-700 list-disc list-inside">
-                            {item.bento_info.common_traits.map((t: string) => <li key={t}>{t}</li>)}
-                          </ul>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            ))}
+        {/* Key Findings Section */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <Activity className="w-5 h-5 text-indigo-500"/>
+            Genetic Highlights
+          </h2>
+          
+          {data.key_findings.map((finding, index) => (
+            <div key={index} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                    {finding.gene}
+                  </span>
+                  <span className="text-xs text-gray-400 ml-2">{finding.rsid}</span>
+                </div>
+                {/* Impact Badge */}
+                <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                  finding.impact === 'High' ? 'bg-rose-100 text-rose-700' :
+                  finding.impact === 'Medium' ? 'bg-amber-100 text-amber-700' :
+                  'bg-emerald-100 text-emerald-700'
+                }`}>
+                  {finding.impact} Impact
+                </span>
+              </div>
+              <p className="text-gray-600 text-sm leading-relaxed">{finding.summary}</p>
+            </div>
+          ))}
+          
+          <div className="bg-blue-50 p-4 rounded-xl flex gap-3 text-sm text-blue-800 mt-6">
+            <Info className="w-5 h-5 shrink-0" />
+            <p><strong>Note:</strong> Genetics represent probabilities, not destinies. Environmental factors and neuroplasticity play massive roles in how these traits manifest.</p>
           </div>
-        ) : null}
-      </AnimatePresence>
+        </div>
+
+      </div>
     </div>
   );
 }
