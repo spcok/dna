@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { supabase } from "../lib/supabase";
-import { CombinerResult } from "../lib/combiner";
+import { CombinerResult, SNP_DICTIONARY } from "../lib/combiner";
 
 // Initialize Gemini
 // In this environment, the API key is injected into process.env.GEMINI_API_KEY
@@ -42,10 +42,19 @@ export const analysisService = {
       }
     }
 
-    // 2. Query Gemini
-    const result = await this.queryGemini(moduleId, snpData.snps);
+    // 2. Filter SNPs for this module
+    const relevantSnps: Record<string, string | null> = {};
+    const targetRsids = SNP_DICTIONARY[moduleId] || [];
+    for (const rsid of targetRsids) {
+      if (snpData.snps[rsid] !== undefined) {
+        relevantSnps[rsid] = snpData.snps[rsid];
+      }
+    }
 
-    // 3. Cache Result
+    // 3. Query Gemini
+    const result = await this.queryGemini(moduleId, relevantSnps);
+
+    // 4. Cache Result
     if (user && result) {
       await supabase
         .from('module_results')

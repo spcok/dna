@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/useAppStore';
-import { Pill, AlertTriangle, CheckCircle, Info, Activity } from 'lucide-react';
+import { analysisService } from '../services/analysisService';
+import { Pill, AlertTriangle, CheckCircle, Info, Activity, ShieldAlert } from 'lucide-react';
 
 interface PGxData {
   module: string;
@@ -20,34 +20,34 @@ interface PGxData {
 }
 
 export default function Pharmacogenomics() {
-  const { user } = useAppStore();
+  const { snpData, getCachedModule, setModuleCache } = useAppStore();
   const [data, setData] = useState<PGxData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchModuleData() {
-      if (!user) return;
+      if (!snpData) {
+        setError('No SNP data available. Please upload your DNA file.');
+        setLoading(false);
+        return;
+      }
+
+      // 1. Check local cache
+      const cached = getCachedModule('pgx');
+      if (cached) {
+        setData(cached.data as PGxData);
+        setLoading(false);
+        return;
+      }
+
       try {
-        const { data: cachedResult } = await supabase
-          .from('module_results')
-          .select('ai_summary')
-          .eq('user_id', user.id)
-          .eq('module_name', 'Pharmacogenomics')
-          .single();
-
-        if (cachedResult?.ai_summary) {
-          setData(cachedResult.ai_summary as PGxData);
-          setLoading(false);
-          return;
-        }
-
-        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('interpret-dna', {
-          body: { moduleName: 'Pharmacogenomics' },
-        });
-
-        if (edgeError) throw edgeError;
-        setData(edgeData);
+        // 2. Process via analysisService
+        const result = await analysisService.analyzeModule('pgx', snpData);
+        
+        // 3. Update local cache
+        setModuleCache('pgx', result);
+        setData(result.data as PGxData);
       } catch (err: any) {
         setError(err.message || 'Failed to load pharmacogenomics profile.');
       } finally {
@@ -56,7 +56,7 @@ export default function Pharmacogenomics() {
     }
 
     fetchModuleData();
-  }, [user]);
+  }, [snpData, getCachedModule, setModuleCache]);
 
   if (loading) return <div className="flex justify-center items-center h-screen animate-pulse text-teal-500">Analyzing Metabolic Pathways...</div>;
   if (error) return <div className="p-6 bg-red-50 text-red-600 rounded-lg shadow-sm">Error: {error}</div>;
@@ -88,10 +88,10 @@ export default function Pharmacogenomics() {
             const isGreen = warning.warning_level === 'Green';
 
             return (
-              <div key={idx} className={`p-5 rounded-xl border ${
-                isRed ? 'bg-red-50 border-red-100' : 
-                isYellow ? 'bg-amber-50 border-amber-100' : 
-                'bg-emerald-50 border-emerald-100'
+              <div key={idx} className={`p-5 rounded-xl border-l-4 ${
+                isRed ? 'bg-red-50 border-red-500' : 
+                isYellow ? 'bg-amber-50 border-amber-500' : 
+                'bg-emerald-50 border-emerald-500'
               }`}>
                 <div className="flex items-start gap-3">
                   {isGreen ? <CheckCircle className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" /> : 
@@ -99,6 +99,13 @@ export default function Pharmacogenomics() {
                   <div>
                     <h3 className={`font-semibold ${isRed ? 'text-red-900' : isYellow ? 'text-amber-900' : 'text-emerald-900'}`}>
                       {warning.drug_class}
+                      <span className={`ml-2 text-xs font-bold uppercase px-2 py-0.5 rounded ${
+                        isRed ? 'bg-red-200 text-red-800' : 
+                        isYellow ? 'bg-amber-200 text-amber-800' : 
+                        'bg-emerald-200 text-emerald-800'
+                      }`}>
+                        {warning.warning_level} Risk
+                      </span>
                     </h3>
                     <p className={`text-sm mt-1 leading-relaxed ${isRed ? 'text-red-800' : isYellow ? 'text-amber-800' : 'text-emerald-800'}`}>
                       {warning.recommendation}

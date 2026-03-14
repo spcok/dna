@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAppStore } from '../store/useAppStore';
+import { analysisService } from '../services/analysisService';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import { Brain, AlertCircle, Activity, Info } from 'lucide-react';
 
@@ -21,36 +22,34 @@ interface NeuroData {
 }
 
 export default function Neurodivergence() {
-  const { user } = useAppStore();
+  const { snpData, getCachedModule, setModuleCache } = useAppStore();
   const [data, setData] = useState<NeuroData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchModuleData() {
-      if (!user) return;
+      if (!snpData) {
+        setError('No SNP data available. Please upload your DNA file.');
+        setLoading(false);
+        return;
+      }
+
+      // 1. Check local cache
+      const cached = getCachedModule('neurodivergence');
+      if (cached) {
+        setData(cached.data as NeuroData);
+        setLoading(false);
+        return;
+      }
+
       try {
-        // First, check if we already have the data cached in Supabase
-        const { data: cachedResult, error: dbError } = await supabase
-          .from('module_results')
-          .select('ai_summary')
-          .eq('user_id', user.id)
-          .eq('module_name', 'Neurodivergence')
-          .single();
-
-        if (cachedResult?.ai_summary) {
-          setData(cachedResult.ai_summary as NeuroData);
-          setLoading(false);
-          return;
-        }
-
-        // If not cached, call the Edge Function to process it
-        const { data: edgeData, error: edgeError } = await supabase.functions.invoke('interpret-dna', {
-          body: { moduleName: 'Neurodivergence' },
-        });
-
-        if (edgeError) throw edgeError;
-        setData(edgeData);
+        // 2. Process via analysisService (which handles Supabase caching and AI query)
+        const result = await analysisService.analyzeModule('neurodivergence', snpData);
+        
+        // 3. Update local cache
+        setModuleCache('neurodivergence', result);
+        setData(result.data as NeuroData);
       } catch (err: any) {
         setError(err.message || 'Failed to load neurogenetics profile.');
       } finally {
@@ -59,7 +58,7 @@ export default function Neurodivergence() {
     }
 
     fetchModuleData();
-  }, [user]);
+  }, [snpData, getCachedModule, setModuleCache]);
 
   if (loading) return <div className="flex justify-center items-center h-screen animate-pulse text-indigo-500">Sequencing Neural Pathways...</div>;
   if (error) return <div className="p-6 bg-red-50 text-red-600 rounded-lg shadow-sm">Error: {error}</div>;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { parseAncestryDNA, TARGET_RSIDS } from '../lib/combiner';
+import { parseAncestryDNA } from '../lib/combiner';
 import { useAppStore } from '../store/useAppStore';
 import { supabase } from '../lib/supabase';
 import { Upload, ShieldAlert, FileJson, Activity, Database, BrainCircuit, CheckCircle2, CloudUpload } from 'lucide-react';
@@ -32,7 +32,7 @@ export default function Ingestion() {
 
     try {
       // 1. Process entirely client-side (The Combiner)
-      const data = await parseAncestryDNA(file, TARGET_RSIDS);
+      const data = await parseAncestryDNA(file);
       setSnpData(data);
       
       // 2. If user is logged in, push to Supabase

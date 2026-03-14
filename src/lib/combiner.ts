@@ -3,19 +3,38 @@
  * Ensures raw genomic data never leaves the user's device.
  */
 
-// A test array of 10 specific RSIDs for the active modules
-export const TARGET_RSIDS = [
-  'rs4680',    // COMT (Dopamine/Pain/Cognition)
-  'rs1800497', // DRD2 (Dopamine receptor/Addiction)
-  'rs1801260', // CLOCK (Circadian rhythm/Sleep)
-  'rs4988235', // LCT (Lactose tolerance)
-  'rs9939609', // FTO (Fat mass/obesity)
-  'rs1799971', // OPRM1 (Opioid receptor/Pain sensitivity)
-  'rs1815739', // ACTN3 (Muscle fiber type/Athletic performance)
-  'rs7412',    // APOE (Alzheimer's/Cardiovascular risk)
-  'rs429358',  // APOE (Alzheimer's/Cardiovascular risk)
-  'rs6152'     // AR (Androgen receptor/Hair loss)
-];
+export const SNP_DICTIONARY: Record<string, string[]> = {
+  neurodivergence: [
+    'rs6265',    // BDNF
+    'rs53576',   // OXTR
+    'rs1801133', // MTHFR
+    'rs1801131', // MTHFR
+    'rs25531',   // SLC6A4
+    'rs4795541', // SLC6A4
+    'rs1800497', // DRD2
+    'rs1799732', // DRD2
+    'rs11246226',// DRD4
+    'rs1800955', // DRD4
+    'rs4680',    // COMT
+    'rs4504469', // KIAA0319
+    'rs806151',  // HDC
+    'rs7794745'  // CNTNAP2
+  ],
+  pgx: [
+    'rs1065852', // CYP2D6
+    'rs3892097', // CYP2D6
+    'rs12248560',// CYP2C19
+    'rs4244285', // CYP2C19
+    'rs1799853', // CYP2C9
+    'rs1057910', // CYP2C9
+    'rs4149056', // SLCO1B1
+    'rs9923231', // VKORC1
+    'rs1799971'  // OPRM1
+  ],
+  // Add other modules as needed
+};
+
+export const TARGET_RSIDS = Object.values(SNP_DICTIONARY).flat();
 
 export interface CombinerResult {
   privacy_check: boolean;
@@ -25,19 +44,23 @@ export interface CombinerResult {
 
 /**
  * Parses an AncestryDNA or generic 23andMe style raw data file locally.
- * Extracts only the targeted RSIDs.
+ * Extracts only the targeted RSIDs for a given module.
  * 
  * @param file The raw DNA File object uploaded by the user
- * @param targetRsids Array of RSIDs to extract
+ * @param moduleId The module ID to filter SNPs by
  * @returns A clean JSON object ready for the database/AI
  */
 export async function parseAncestryDNA(
   file: File, 
-  targetRsids: string[] = TARGET_RSIDS
+  moduleId?: string
 ): Promise<CombinerResult> {
   const text = await file.text();
   const lines = text.split('\n');
   const extracted: Record<string, string | null> = {};
+  
+  const targetRsids = moduleId && SNP_DICTIONARY[moduleId] 
+    ? SNP_DICTIONARY[moduleId] 
+    : TARGET_RSIDS;
 
   let isAncestry = false;
   let is23andMe = false;
