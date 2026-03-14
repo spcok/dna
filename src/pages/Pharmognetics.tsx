@@ -82,7 +82,7 @@ export default function Pharmacogenomics() {
           Digital Medicine Cabinet
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {data.medicine_cabinet_warnings.map((warning, idx) => {
+          {(data.medicine_cabinet_warnings || []).map((warning, idx) => {
             const isRed = warning.warning_level === 'Red';
             const isYellow = warning.warning_level === 'Yellow';
             const isGreen = warning.warning_level === 'Green';
@@ -125,7 +125,7 @@ export default function Pharmacogenomics() {
           Liver Enzyme Profile (CYP450)
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {data.metabolism_profiles.map((profile, idx) => (
+          {(data.metabolism_profiles || []).map((profile, idx) => (
             <div key={idx} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
               <div className="flex justify-between items-start mb-3">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-bold bg-gray-100 text-gray-800">
@@ -141,7 +141,7 @@ export default function Pharmacogenomics() {
               <div className="mt-3 pt-3 border-t border-gray-50">
                 <p className="text-xs text-gray-400 mb-1 uppercase tracking-wider">Affected Drugs</p>
                 <div className="flex flex-wrap gap-1">
-                  {profile.affected_drugs.map((drug, i) => (
+                  {(profile.affected_drugs || []).map((drug, i) => (
                     <span key={i} className="text-xs bg-teal-50 text-teal-700 px-2 py-1 rounded-full">
                       {drug}
                     </span>

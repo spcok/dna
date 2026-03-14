@@ -65,7 +65,7 @@ export default function Neurodivergence() {
   if (!data) return null;
 
   // Format data for the radar chart (converting 0.55 to 55 for visual scaling)
-  const chartData = data.radar_data.map(d => ({
+  const chartData = (data.radar_data || []).map(d => ({
     subject: d.trait,
     A: d.probability * 100,
     fullMark: 100,
@@ -119,7 +119,7 @@ export default function Neurodivergence() {
             Genetic Highlights
           </h2>
           
-          {data.key_findings.map((finding, index) => (
+          {(data.key_findings || []).map((finding, index) => (
             <div key={index} className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-2">
                 <div>
