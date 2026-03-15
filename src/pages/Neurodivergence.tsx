@@ -38,7 +38,7 @@ export default function Neurodivergence() {
       // 1. Check local cache
       const cached = getCachedModule('neurodivergence');
       if (cached) {
-        setData(cached.data as NeuroData);
+        setData(cached as unknown as NeuroData);
         setLoading(false);
         return;
       }
@@ -49,7 +49,7 @@ export default function Neurodivergence() {
         
         // 3. Update local cache
         setModuleCache('neurodivergence', result);
-        setData(result.data as NeuroData);
+        setData(result as unknown as NeuroData);
       } catch (err: any) {
         setError(err.message || 'Failed to load neurogenetics profile.');
       } finally {

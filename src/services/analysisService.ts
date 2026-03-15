@@ -3,13 +3,7 @@ import { CombinerResult } from "../lib/combiner";
 
 export type ModuleId = 'ancestry' | 'health' | 'neurodivergence' | 'traits' | 'pgx' | 'nutrigenomics';
 
-export interface AnalysisResponse {
-  module_id: ModuleId;
-  summary: string;
-  data: any;
-  recommendations: string[];
-  compliance_check: boolean;
-}
+export type AnalysisResponse = any;
 
 export const analysisService = {
   async analyzeModule(moduleId: ModuleId, snpData: CombinerResult): Promise<AnalysisResponse> {
